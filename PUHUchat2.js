@@ -3,7 +3,7 @@ const express = require('express');
 const { exec } = require('child_process');
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 3000;  // Render needs this!
 
 // Ensure API keys exist
 if (!process.env.API_KEY) {
@@ -28,4 +28,5 @@ app.get('/run', (req, res) => {
     });
 });
 
-app.listen(port, () => console.log(`# Chatbot running on port ${port} 🚀`));
+// Ensure Express is listening
+app.listen(port, () => console.log(`🚀 Server running on port ${port}`));
