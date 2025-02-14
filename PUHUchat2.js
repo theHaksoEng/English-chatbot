@@ -11,19 +11,18 @@ if (!process.env.API_KEY) {
     process.exit(1);
 }
 
-// Middleware to parse JSON requests
-app.use(express.json());
+// ✅ Basic route for testing
+app.get('/', (req, res) => {
+    res.send('✅ Chatbot is running!');
+});
 
-// Root route for testing
-app.get('/', (req, res) => res.send('✅ Chatbot Server is Running!'));
-
-// Voices route
+// ✅ Route to list available voices
 app.get('/voices', (req, res) => {
     const voices = ["Aaron Clone", "Päivi Clone", "Junior Clone"];
     res.json({ availableVoices: voices });
 });
 
-// Example command execution route
+// ✅ Example command execution (modify as needed)
 app.get('/run', (req, res) => {
     exec('echo "Running command"', (error, stdout) => {
         if (error) return res.status(500).send("Error executing command");
@@ -31,5 +30,5 @@ app.get('/run', (req, res) => {
     });
 });
 
-// Start server
-app.listen(port, () => console.log(`🚀 Chatbot Server is running on port ${port}`));
+// ✅ Start the Express server
+app.listen(port, () => console.log(`🚀 Chatbot server running on port ${port}`));
