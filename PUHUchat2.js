@@ -1,7 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const fetch = require('node-fetch'); // Ensure this package is installed
+const fetch = require('node-fetch');
+const { exec } = require('child_process');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -11,14 +12,24 @@ app.use(cors());
 
 // ✅ Debugging: Log Environment Variables
 console.log("🔍 Checking Environment Variables...");
-console.log("🔑 OPENAI_API_KEY:", process.env.OPENAI_API_KEY ? "✅ Loaded" : "❌ Missing");
-console.log("🔑 CHATBASE_API_KEY:", process.env.CHATBASE_API_KEY ? "✅ Loaded" : "❌ Missing");
-console.log("🔑 ELEVENLABS_API_KEY:", process.env.ELEVENLABS_API_KEY ? "✅ Loaded" : "❌ Missing");
-console.log("🔑 VOICE_ID_API_KEY:", process.env.VOICE_ID_API_KEY ? "✅ Loaded" : "❌ Missing");
+const requiredKeys = [
+    "OPENAI_API_KEY",
+    "CHATBASE_API_KEY",
+    "ELEVENLABS_API_KEY",
+    "VOICE_ID_API_KEY"
+];
 
-// ✅ Ensure all API keys exist
-if (!process.env.OPENAI_API_KEY || !process.env.CHATBASE_API_KEY || !process.env.ELEVEN_LABS_API_KEY || !process.env.VOICE_ID) {
-    console.error("❌ Error: Some API keys are missing! Check your .env file or Render environment.");
+// ✅ Store missing keys
+const missingKeys = requiredKeys.filter(key => !process.env[key]);
+
+// ✅ Log results
+requiredKeys.forEach(key => {
+    console.log(`🔑 ${key}:`, process.env[key] ? "✅ Loaded" : "❌ Missing");
+});
+
+// ✅ Stop execution if any keys are missing
+if (missingKeys.length > 0) {
+    console.error(`❌ Error: Missing API keys -> ${missingKeys.join(', ')}`);
     process.exit(1);
 }
 
@@ -33,20 +44,38 @@ app.get('/voices', (req, res) => {
     res.json({ availableVoices: voices });
 });
 
-// ✅ Chat route to handle user messages
-app.get('/chat', (req, res) => {
+// ✅ NEW: Chat route to handle user messages
+app.get('/chat', async (req, res) => {
     const userMessage = req.query.message;
     if (!userMessage) {
         return res.status(400).json({ error: "❌ No message provided!" });
     }
 
-    // Simulated chatbot logic - Replace with actual API call
-    const botResponse = `🤖 You said: "${userMessage}"`;
+    try {
+        // Simulating chatbot logic - Replace with actual Chatbase API call
+        const chatResponse = await fetch("https://api.chatbase.co/chat", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${process.env.CHATBASE_API_KEY}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ message: userMessage })
+        });
 
-    res.json({ response: botResponse });
+        if (!chatResponse.ok) {
+            throw new Error(`Chatbase API Error: ${chatResponse.statusText}`);
+        }
+
+        const responseData = await chatResponse.json();
+        res.json({ response: responseData.message || `🤖 You said: "${userMessage}"` });
+
+    } catch (error) {
+        console.error("❌ Chatbot Error:", error);
+        res.status(500).json({ error: "Failed to generate chatbot response" });
+    }
 });
 
-// ✅ NEW: Voice Response Route (Integrate Eleven Labs API)
+// ✅ NEW: Voice Response Route (Eleven Labs API)
 app.get('/voice', async (req, res) => {
     const userMessage = req.query.message;
     if (!userMessage) {
@@ -54,27 +83,23 @@ app.get('/voice', async (req, res) => {
     }
 
     try {
-        const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${process.env.VOICE_ID}`, {
+        const voiceResponse = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${process.env.VOICE_ID_API_KEY}`, {
             method: "POST",
             headers: {
-                "Authorization": `Bearer ${process.env.ELEVEN_LABS_API_KEY}`,
+                "Authorization": `Bearer ${process.env.ELEVENLABS_API_KEY}`,
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
                 text: userMessage,
-                model_id: "eleven_monolingual_v1", // Change this if needed
-                voice_settings: {
-                    stability: 0.5,
-                    similarity_boost: 0.8
-                }
+                voice_id: process.env.VOICE_ID_API_KEY
             })
         });
 
-        if (!response.ok) {
-            throw new Error(`❌ Voice synthesis failed: ${response.statusText}`);
+        if (!voiceResponse.ok) {
+            throw new Error(`❌ Voice synthesis failed: ${voiceResponse.statusText}`);
         }
 
-        const audioBuffer = await response.arrayBuffer();
+        const audioBuffer = await voiceResponse.arrayBuffer();
         res.setHeader("Content-Type", "audio/mpeg");
         res.send(Buffer.from(audioBuffer));
 
@@ -82,6 +107,14 @@ app.get('/voice', async (req, res) => {
         console.error("❌ Error in voice synthesis:", error);
         res.status(500).json({ error: "Failed to generate voice response" });
     }
+});
+
+// ✅ Example route for executing shell commands (modify as needed)
+app.get('/run', (req, res) => {
+    exec('echo "Running command"', (error, stdout) => {
+        if (error) return res.status(500).send("Error executing command");
+        res.send(stdout);
+    });
 });
 
 // ✅ Start the Express server
