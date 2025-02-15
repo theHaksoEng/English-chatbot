@@ -13,8 +13,8 @@ app.use(cors());
 console.log("🔍 Checking Environment Variables...");
 console.log("🔑 OPENAI_API_KEY:", process.env.OPENAI_API_KEY ? "✅ Loaded" : "❌ Missing");
 console.log("🔑 CHATBASE_API_KEY:", process.env.CHATBASE_API_KEY ? "✅ Loaded" : "❌ Missing");
-console.log("🔑 ELEVEN_LABS_API_KEY:", process.env.ELEVEN_LABS_API_KEY ? "✅ Loaded" : "❌ Missing");
-console.log("🔑 VOICE_ID:", process.env.VOICE_ID ? "✅ Loaded" : "❌ Missing");
+console.log("🔑 ELEVENLABS_API_KEY:", process.env.ELEVENLABS_API_KEY ? "✅ Loaded" : "❌ Missing");
+console.log("🔑 VOICE_ID_API_KEY:", process.env.VOICE_ID_API_KEY ? "✅ Loaded" : "❌ Missing");
 
 // ✅ Ensure all API keys exist
 if (!process.env.OPENAI_API_KEY || !process.env.CHATBASE_API_KEY || !process.env.ELEVEN_LABS_API_KEY || !process.env.VOICE_ID) {
