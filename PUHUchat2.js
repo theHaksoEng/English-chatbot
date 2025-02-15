@@ -1,21 +1,17 @@
-require('dotenv').config(); // ✅ Load environment variables
-
+require('dotenv').config();
 const express = require('express');
 const { exec } = require('child_process');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// ✅ Debugging: Check if API key is being loaded
-console.log("🔍 Checking API Key...");
+// ✅ Ensure API key exists
 if (!process.env.OPENAI_API_KEY) {
-    console.error("❌ MISSING API KEY: Check your .env file or Render environment variables.");
-    process.exit(1); // Stop execution if missing
-} else {
-    console.log("✅ API Key Loaded Successfully!");
+    console.error("❌ Error: Missing API key. Check your .env file.");
+    process.exit(1);
 }
 
-// ✅ Basic route for testing if the server is running
+// ✅ Basic route to check if the server is running
 app.get('/', (req, res) => {
     res.send('✅ Chatbot is running!');
 });
@@ -26,15 +22,20 @@ app.get('/voices', (req, res) => {
     res.json({ availableVoices: voices });
 });
 
-// ✅ Example route to check API key is accessible via server
-app.get('/check-api', (req, res) => {
-    if (!process.env.OPENAI_API_KEY) {
-        return res.status(500).json({ error: "❌ API Key is missing from the environment variables!" });
+// ✅ NEW: Chat route to handle user messages
+app.get('/chat', (req, res) => {
+    const userMessage = req.query.message;
+    if (!userMessage) {
+        return res.status(400).json({ error: "❌ No message provided!" });
     }
-    res.json({ message: "✅ API Key is loaded and working!" });
+
+    // Simulating chatbot logic - Replace with actual AI API call
+    const botResponse = `🤖 You said: "${userMessage}"`;
+
+    res.json({ response: botResponse });
 });
 
-// ✅ Example command execution (modify as needed)
+// ✅ Example route for executing shell commands (modify as needed)
 app.get('/run', (req, res) => {
     exec('echo "Running command"', (error, stdout) => {
         if (error) return res.status(500).send("Error executing command");
