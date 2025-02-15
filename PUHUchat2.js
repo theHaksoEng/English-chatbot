@@ -1,9 +1,17 @@
 require('dotenv').config();
 const express = require('express');
+const cors = require('cors');  // ✅ Import CORS
 const { exec } = require('child_process');
 
 const app = express();
 const port = process.env.PORT || 3000;
+
+// ✅ Enable CORS for all requests
+app.use(cors({
+    origin: '*',  // Allow requests from any domain (Can be restricted for security)
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type']
+}));
 
 // ✅ Ensure API key exists
 if (!process.env.OPENAI_API_KEY) {
