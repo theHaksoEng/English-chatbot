@@ -14,11 +14,12 @@ app.use(cors());
 console.log("🔍 Checking Environment Variables...");
 console.log("🔑 OPENAI_API_KEY:", process.env.OPENAI_API_KEY ? "✅ Loaded" : "❌ Missing");
 console.log("🔑 CHATBASE_API_KEY:", process.env.CHATBASE_API_KEY ? "✅ Loaded" : "❌ Missing");
+console.log("🔑 CHATBASE_BOT_ID:", process.env.CHATBASE_BOT_ID ? "✅ Loaded" : "❌ Missing");
 console.log("🔑 ELEVENLABS_API_KEY:", process.env.ELEVENLABS_API_KEY ? "✅ Loaded" : "❌ Missing");
 console.log("🔑 VOICE_ID_API_KEY:", process.env.VOICE_ID_API_KEY ? "✅ Loaded" : "❌ Missing");
 
 // ✅ Ensure all API keys exist before running the server
-if (!process.env.OPENAI_API_KEY || !process.env.CHATBASE_API_KEY || !process.env.ELEVENLABS_API_KEY || !process.env.VOICE_ID) {
+if (!process.env.OPENAI_API_KEY || !process.env.CHATBASE_API_KEY || !process.env.ELEVENLABS_API_KEY || !process.env.VOICE_ID_API_KEY) {
     console.error("❌ Error: Some API keys are missing! Check your .env file or Render environment.");
     process.exit(1);
 }
