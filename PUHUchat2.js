@@ -34,37 +34,6 @@ app.get('/voices', (req, res) => {
     res.json({ availableVoices: voices });
 });
 
-// ✅ Chat Route (Send message to Chatbase)
-app.get('/chat', async (req, res) => {
-    const userMessage = req.query.message;
-    if (!userMessage) {
-        return res.status(400).json({ error: "❌ No message provided!" });
-    }
-
-    try {
-        const response = await fetch(`https://api.chatbase.co/api/v1/bots/${process.env.CHATBASE_BOT_ID}/chat`, {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${process.env.CHATBASE_API_KEY}`,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ message: userMessage })
-        });
-
-        if (!response.ok) {
-            throw new Error(`Chatbase API Error: ${response.statusText}`);
-        }
-
-        const responseData = await response.json();
-        console.log("📝 Chatbase Response:", responseData);
-        res.json({ response: responseData.message || "🤖 No response from chatbot" });
-
-    } catch (error) {
-        console.error("❌ Chatbot Error:", error);
-        res.status(500).json({ error: "Failed to generate chatbot response" });
-    }
-});
-
 // ✅ Voice Response Route (Fixing Eleven Labs Issue)
 app.get('/voice', async (req, res) => {
     const userMessage = req.query.message;
@@ -73,10 +42,9 @@ app.get('/voice', async (req, res) => {
     }
 
     try {
-        const elevenLabsURL = "https://api.elevenlabs.io/v1/text-to-speech";
-        const voiceID = process.env.VOICE_ID_API_KEY; // Ensure this is correct
-
-        console.log(`🔊 Sending to Eleven Labs: ${userMessage}`);
+        const elevenLabsURL = `https://api.elevenlabs.io/v1/text-to-speech/${process.env.VOICE_ID_API_KEY}`;
+        
+        console.log(`🔊 Sending message to Eleven Labs: ${userMessage}`);
 
         const response = await fetch(elevenLabsURL, {
             method: "POST",
@@ -86,9 +54,8 @@ app.get('/voice', async (req, res) => {
             },
             body: JSON.stringify({
                 text: userMessage,
-                voice_id: voiceID,
-                model_id: "eleven_monolingual_v1", // Ensure this is correct
-                settings: {
+                model_id: "eleven_monolingual_v1",
+                voice_settings: {
                     stability: 0.5,
                     similarity_boost: 0.5
                 }
@@ -97,8 +64,11 @@ app.get('/voice', async (req, res) => {
 
         if (!response.ok) {
             const errorText = await response.text();
-            throw new Error(`Eleven Labs API Error: ${errorText}`);
+            console.error(`❌ Eleven Labs API Error: ${errorText}`);
+            return res.status(500).json({ error: `Eleven Labs API Error: ${errorText}` });
         }
+
+        console.log("✅ Eleven Labs API Response Received!");
 
         const audioBuffer = await response.arrayBuffer();
         res.setHeader("Content-Type", "audio/mpeg");
