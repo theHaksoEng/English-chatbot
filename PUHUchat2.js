@@ -1,8 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const fetch = require('node-fetch');
 const { exec } = require('child_process');
+const fetch = require('node-fetch'); // Ensure this is installed using `npm install node-fetch`
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -12,24 +12,14 @@ app.use(cors());
 
 // ✅ Debugging: Log Environment Variables
 console.log("🔍 Checking Environment Variables...");
-const requiredKeys = [
-    "OPENAI_API_KEY",
-    "CHATBASE_API_KEY",
-    "ELEVENLABS_API_KEY",
-    "VOICE_ID_API_KEY"
-];
+console.log("🔑 OPENAI_API_KEY:", process.env.OPENAI_API_KEY ? "✅ Loaded" : "❌ Missing");
+console.log("🔑 CHATBASE_API_KEY:", process.env.CHATBASE_API_KEY ? "✅ Loaded" : "❌ Missing");
+console.log("🔑 ELEVENLABS_API_KEY:", process.env.ELEVENLABS_API_KEY ? "✅ Loaded" : "❌ Missing");
+console.log("🔑 VOICE_ID_API_KEY:", process.env.VOICE_ID_API_KEY ? "✅ Loaded" : "❌ Missing");
 
-// ✅ Store missing keys
-const missingKeys = requiredKeys.filter(key => !process.env[key]);
-
-// ✅ Log results
-requiredKeys.forEach(key => {
-    console.log(`🔑 ${key}:`, process.env[key] ? "✅ Loaded" : "❌ Missing");
-});
-
-// ✅ Stop execution if any keys are missing
-if (missingKeys.length > 0) {
-    console.error(`❌ Error: Missing API keys -> ${missingKeys.join(', ')}`);
+// ✅ Ensure all API keys exist before running the server
+if (!process.env.OPENAI_API_KEY || !process.env.CHATBASE_API_KEY || !process.env.ELEVENLABS_API_KEY || !process.env.VOICE_ID) {
+    console.error("❌ Error: Some API keys are missing! Check your .env file or Render environment.");
     process.exit(1);
 }
 
@@ -44,7 +34,7 @@ app.get('/voices', (req, res) => {
     res.json({ availableVoices: voices });
 });
 
-// ✅ NEW: Chat route to handle user messages
+// ✅ Chat route to handle user messages via Chatbase API
 app.get('/chat', async (req, res) => {
     const userMessage = req.query.message;
     if (!userMessage) {
@@ -52,7 +42,8 @@ app.get('/chat', async (req, res) => {
     }
 
     try {
-        // Simulating chatbot logic - Replace with actual Chatbase API call
+        console.log("📝 Sending message to Chatbase:", userMessage);
+        
         const chatResponse = await fetch("https://api.chatbase.co/chat", {
             method: "POST",
             headers: {
@@ -67,6 +58,8 @@ app.get('/chat', async (req, res) => {
         }
 
         const responseData = await chatResponse.json();
+        console.log("💬 Chatbase Response:", responseData);
+
         res.json({ response: responseData.message || `🤖 You said: "${userMessage}"` });
 
     } catch (error) {
@@ -75,7 +68,7 @@ app.get('/chat', async (req, res) => {
     }
 });
 
-// ✅ NEW: Voice Response Route (Eleven Labs API)
+// ✅ Voice Response Route (Eleven Labs API)
 app.get('/voice', async (req, res) => {
     const userMessage = req.query.message;
     if (!userMessage) {
@@ -83,7 +76,9 @@ app.get('/voice', async (req, res) => {
     }
 
     try {
-        const voiceResponse = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${process.env.VOICE_ID_API_KEY}`, {
+        console.log("🗣️ Sending text to Eleven Labs:", userMessage);
+
+        const voiceResponse = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${process.env.VOICE_ID}`, {
             method: "POST",
             headers: {
                 "Authorization": `Bearer ${process.env.ELEVENLABS_API_KEY}`,
@@ -91,7 +86,11 @@ app.get('/voice', async (req, res) => {
             },
             body: JSON.stringify({
                 text: userMessage,
-                voice_id: process.env.VOICE_ID_API_KEY
+                model_id: "eleven_multilingual_v2",
+                voice_settings: {
+                    stability: 0.5,
+                    similarity_boost: 0.8
+                }
             })
         });
 
@@ -100,6 +99,8 @@ app.get('/voice', async (req, res) => {
         }
 
         const audioBuffer = await voiceResponse.arrayBuffer();
+        console.log("🔊 Voice generated successfully!");
+
         res.setHeader("Content-Type", "audio/mpeg");
         res.send(Buffer.from(audioBuffer));
 
