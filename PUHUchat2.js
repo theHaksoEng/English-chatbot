@@ -1,54 +1,64 @@
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');  // ✅ Import CORS
-const { exec } = require('child_process');
+const cors = require('cors');
+const axios = require('axios');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// ✅ Enable CORS for all requests
-app.use(cors({
-    origin: '*',  // Allow requests from any domain (Can be restricted for security)
-    methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type']
-}));
+// ✅ Enable CORS for WordPress
+app.use(cors());
 
-// ✅ Ensure API key exists
-if (!process.env.OPENAI_API_KEY) {
-    console.error("❌ Error: Missing API key. Check your .env file.");
+// ✅ Ensure API keys exist
+if (!process.env.CHATBASE_API_KEY || !process.env.ELEVEN_LABS_API_KEY) {
+    console.error("❌ Error: Missing API keys. Check your .env file.");
     process.exit(1);
 }
 
-// ✅ Basic route to check if the server is running
+// ✅ Basic test route
 app.get('/', (req, res) => {
-    res.send('✅ Chatbot is running!');
+    res.send('✅ Chatbot is running with Chatbase & Eleven Labs!');
 });
 
-// ✅ Route to list available voices
-app.get('/voices', (req, res) => {
-    const voices = ["Aaron Clone", "Päivi Clone", "Junior Clone"];
-    res.json({ availableVoices: voices });
-});
-
-// ✅ NEW: Chat route to handle user messages
-app.get('/chat', (req, res) => {
+// ✅ Chat route (process user messages with Chatbase & generate voice)
+app.get('/chat', async (req, res) => {
     const userMessage = req.query.message;
     if (!userMessage) {
         return res.status(400).json({ error: "❌ No message provided!" });
     }
 
-    // Simulating chatbot logic - Replace with actual AI API call
-    const botResponse = `🤖 You said: "${userMessage}"`;
+    try {
+        // 🔹 Send message to Chatbase AI
+        const chatbaseResponse = await axios.post(
+            `https://www.chatbase.co/api/v1/chat`,
+            { message: userMessage },
+            { headers: { "Authorization": `Bearer ${process.env.CHATBASE_API_KEY}` } }
+        );
 
-    res.json({ response: botResponse });
-});
+        const botMessage = chatbaseResponse.data.response || "Sorry, I didn't understand that.";
 
-// ✅ Example route for executing shell commands (modify as needed)
-app.get('/run', (req, res) => {
-    exec('echo "Running command"', (error, stdout) => {
-        if (error) return res.status(500).send("Error executing command");
-        res.send(stdout);
-    });
+        // 🔹 Convert botMessage to speech using Eleven Labs
+        const voiceData = await axios.post(
+            `https://api.elevenlabs.io/v1/text-to-speech/YOUR_VOICE_ID`,
+            { text: botMessage },
+            {
+                headers: {
+                    "xi-api-key": process.env.ELEVEN_LABS_API_KEY,
+                    "Content-Type": "application/json"
+                },
+                responseType: "arraybuffer"
+            }
+        );
+
+        // Convert voice response to Base64
+        const audioBase64 = Buffer.from(voiceData.data, 'binary').toString('base64');
+
+        res.json({ response: botMessage, audio: `data:audio/mp3;base64,${audioBase64}` });
+
+    } catch (error) {
+        console.error("❌ Error processing chatbot request:", error);
+        res.status(500).json({ error: "Chatbot error. Try again later!" });
+    }
 });
 
 // ✅ Start the Express server
