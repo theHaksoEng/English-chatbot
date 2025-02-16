@@ -41,7 +41,7 @@ app.get('/voices', (req, res) => {
 });
 
 // ✅ Chat Route (Fixing Chatbase API Method & URL)
-app.post('/chat', async (req, res) => {  // <-- Change to POST!
+app.post('/chat', async (req, res) => {  
     const userMessage = req.query.message;
     if (!userMessage) {
         return res.status(400).json({ error: "❌ No message provided!" });
@@ -88,10 +88,32 @@ app.get('/voice', async (req, res) => {
         const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${process.env.VOICE_ID_API_KEY}`, {
             method: "POST",
             headers: {
-                "xi-api-key": process.env.ELEVENLABS_API_KEY,  // ✅ Ensure the header key is correct
+                "xi-api-key": process.env.ELEVENLABS_API_KEY,  
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
                 text: userMessage,
                 model_id: "eleven_multilingual_v2",
- 
+                voice_settings: {
+                    stability: 0.5,
+                    similarity_boost: 0.8
+                }
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Eleven Labs API Error: ${await response.text()}`);
+        }
+
+        const audioBuffer = await response.arrayBuffer();
+        res.setHeader("Content-Type", "audio/mpeg");
+        res.send(Buffer.from(audioBuffer));
+
+    } catch (error) {
+        console.error("❌ Voice Error:", error);
+        res.status(500).json({ error: "Failed to generate voice response" });
+    }
+});
+
+// ✅ Start Express Server
+app.listen(port, () => console.log(`🚀 Chatbot server running on port ${port}`));
