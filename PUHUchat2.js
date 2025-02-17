@@ -7,9 +7,9 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.json());  // 🔥 Make sure Express can parse JSON requests
+app.use(express.json());  // ✅ Ensures JSON requests are handled
 
-// ✅ Environment Variables Debugging
+// ✅ Debugging: Log Environment Variables
 console.log("🔍 Checking Environment Variables...");
 console.log("🔑 OPENAI_API_KEY:", process.env.OPENAI_API_KEY ? "✅ Loaded" : "❌ Missing");
 console.log("🔑 CHATBASE_API_KEY:", process.env.CHATBASE_API_KEY ? "✅ Loaded" : "❌ Missing");
@@ -22,7 +22,7 @@ app.get('/', (req, res) => {
     res.send('✅ Chatbot is running!');
 });
 
-// ✅ Fix: Ensure /chat Route is Available & Using POST
+// ✅ Fix: Ensure /chat Route is Available & Uses POST
 app.post('/chat', async (req, res) => {
     const { message } = req.body;
     if (!message) {
@@ -55,6 +55,42 @@ app.post('/chat', async (req, res) => {
     } catch (error) {
         console.error("❌ Chatbot Error:", error);
         res.status(500).json({ error: "Failed to generate chatbot response" });
+    }
+});
+
+// ✅ Fix: Voice Response Route (Eleven Labs API)
+app.get('/voice', async (req, res) => {
+    const userMessage = req.query.message;
+    if (!userMessage) {
+        return res.status(400).json({ error: "❌ No message provided for voice synthesis!" });
+    }
+
+    console.log(`🗣️ Generating voice response for: "${userMessage}"`);
+
+    try {
+        const response = await fetch("https://api.elevenlabs.io/v1/text-to-speech", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${process.env.ELEVENLABS_API_KEY}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                text: userMessage,
+                voice_id: process.env.VOICE_ID_API_KEY
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`❌ Eleven Labs API Error: ${response.statusText}`);
+        }
+
+        const audioBuffer = await response.arrayBuffer();
+        res.setHeader("Content-Type", "audio/mpeg");
+        res.send(Buffer.from(audioBuffer));
+
+    } catch (error) {
+        console.error("❌ Voice Error:", error);
+        res.status(500).json({ error: "Failed to generate voice response" });
     }
 });
 
