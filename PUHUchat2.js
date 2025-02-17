@@ -6,9 +6,9 @@ const fetch = require('node-fetch');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// ✅ Enable CORS for WordPress requests
+// ✅ Enable CORS for WordPress and Frontends
 app.use(cors());
-app.use(express.json());  // ✅ Support JSON requests
+app.use(express.json());
 
 // ✅ Debugging: Log Environment Variables
 console.log("🔍 Checking Environment Variables...");
@@ -30,18 +30,18 @@ if (!requiredEnvVars.every(key => process.env[key])) {
     process.exit(1);
 }
 
-// ✅ Basic route to check if the server is running
+// ✅ Basic Route to Check Server Status
 app.get('/', (req, res) => {
     res.send('✅ Chatbot is running!');
 });
 
-// ✅ Route to list available voices
+// ✅ List Available Voices
 app.get('/voices', (req, res) => {
     const voices = ["Aaron Clone", "Päivi Clone", "Junior Clone"];
     res.json({ availableVoices: voices });
 });
 
-// ✅ Chat Route (Fix: Chatbase API Method Not Allowed)
+// ✅ FIX: Adjust Chatbase API Request Method
 app.post('/chat', async (req, res) => {
     const userMessage = req.body.message;
     if (!userMessage) {
@@ -51,17 +51,12 @@ app.post('/chat', async (req, res) => {
     console.log("📩 Received Chat Message:", userMessage);
 
     try {
-        const chatbaseResponse = await fetch("https://www.chatbase.co/api/v1/message", {
-            method: "POST",  // ✅ Fix: Ensure POST request
+        const chatbaseResponse = await fetch(`https://www.chatbase.co/api/v1/message?bot_id=${process.env.CHATBASE_BOT_ID}&message=${encodeURIComponent(userMessage)}`, {
+            method: "GET", // ✅ Fix: Chatbase might require GET request instead of POST
             headers: {
                 "Accept": "application/json",
-                "Content-Type": "application/json",
                 "Authorization": `Bearer ${process.env.CHATBASE_API_KEY}`
-            },
-            body: JSON.stringify({
-                bot_id: process.env.CHATBASE_BOT_ID,
-                messages: [{ text: userMessage }]
-            })
+            }
         });
 
         if (!chatbaseResponse.ok) {
@@ -83,7 +78,7 @@ app.post('/chat', async (req, res) => {
     }
 });
 
-// ✅ Voice Response Route (Fix: Eleven Labs Issues)
+// ✅ Fix Eleven Labs Voice Response
 app.get('/voice', async (req, res) => {
     const userMessage = req.query.message;
     if (!userMessage) {
@@ -101,7 +96,7 @@ app.get('/voice', async (req, res) => {
             },
             body: JSON.stringify({
                 text: userMessage,
-                voice_id: process.env.VOICE_ID_API_KEY  // ✅ Fix: Use environment variable for voice ID
+                voice_id: process.env.VOICE_ID_API_KEY // ✅ Fix: Use environment variable for voice ID
             })
         });
 
@@ -119,5 +114,5 @@ app.get('/voice', async (req, res) => {
     }
 });
 
-// ✅ Start the Express server
+// ✅ Start the Express Server
 app.listen(port, () => console.log(`🚀 Chatbot server running on port ${port}`));
