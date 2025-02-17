@@ -6,68 +6,51 @@ const fetch = require('node-fetch');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// ✅ Enable CORS for frontend (WordPress, Web, etc.)
 app.use(cors());
+app.use(express.json());  // 🔥 Make sure Express can parse JSON requests
 
-// ✅ Debugging: Log Environment Variables
+// ✅ Environment Variables Debugging
 console.log("🔍 Checking Environment Variables...");
-const requiredEnvVars = [
-    "OPENAI_API_KEY",
-    "CHATBASE_API_KEY",
-    "CHATBASE_BOT_ID",
-    "ELEVENLABS_API_KEY",
-    "VOICE_ID_API_KEY"
-];
+console.log("🔑 OPENAI_API_KEY:", process.env.OPENAI_API_KEY ? "✅ Loaded" : "❌ Missing");
+console.log("🔑 CHATBASE_API_KEY:", process.env.CHATBASE_API_KEY ? "✅ Loaded" : "❌ Missing");
+console.log("🔑 CHATBASE_BOT_ID:", process.env.CHATBASE_BOT_ID ? "✅ Loaded" : "❌ Missing");
+console.log("🔑 ELEVENLABS_API_KEY:", process.env.ELEVENLABS_API_KEY ? "✅ Loaded" : "❌ Missing");
+console.log("🔑 VOICE_ID_API_KEY:", process.env.VOICE_ID_API_KEY ? "✅ Loaded" : "❌ Missing");
 
-requiredEnvVars.forEach((key) => {
-    console.log(`🔑 ${key}:`, process.env[key] ? "✅ Loaded" : "❌ Missing");
-});
-
-// ✅ Ensure all API keys exist
-if (requiredEnvVars.some(key => !process.env[key])) {
-    console.error("❌ Error: Some API keys are missing! Check your .env file or Render environment.");
-    process.exit(1);
-}
-
-// ✅ Root Route: Check if Server is Running
+// ✅ Root Route (Check if server is running)
 app.get('/', (req, res) => {
     res.send('✅ Chatbot is running!');
 });
 
-// ✅ Available Voices List
-app.get('/voices', (req, res) => {
-    const voices = ["Aaron Clone", "Päivi Clone", "Junior Clone"];
-    res.json({ availableVoices: voices });
-});
-
-// ✅ Chat Route (Fixing Chatbase API Method & URL)
-app.post('/chat', async (req, res) => {  
-    const userMessage = req.query.message;
-    if (!userMessage) {
+// ✅ Fix: Ensure /chat Route is Available & Using POST
+app.post('/chat', async (req, res) => {
+    const { message } = req.body;
+    if (!message) {
         return res.status(400).json({ error: "❌ No message provided!" });
     }
 
-    try {
-        console.log(`📝 Sending message to Chatbase: ${userMessage}`);
+    console.log(`📝 Sending message to Chatbase: ${message}`);
 
-        const response = await fetch(`https://www.chatbase.co/api/v1/chat/${process.env.CHATBASE_BOT_ID}`, {
+    try {
+        const chatbaseResponse = await fetch(`https://chatbase.co/api/`, {
             method: "POST",
             headers: {
                 "Authorization": `Bearer ${process.env.CHATBASE_API_KEY}`,
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                messages: [{ role: "user", content: userMessage }],
-                chatflowid: process.env.CHATBASE_BOT_ID
+                botId: process.env.CHATBASE_BOT_ID,
+                message: message,
+                userId: "user-123"
             })
         });
 
-        if (!response.ok) {
-            throw new Error(`Chatbase API Error: ${response.statusText}`);
+        if (!chatbaseResponse.ok) {
+            throw new Error(`Chatbase API Error: ${chatbaseResponse.statusText}`);
         }
 
-        const data = await response.json();
-        res.json({ response: data.text || "🤖 No response from Chatbase." });
+        const data = await chatbaseResponse.json();
+        res.json({ response: data.reply || "🤖 No response received!" });
 
     } catch (error) {
         console.error("❌ Chatbot Error:", error);
@@ -75,45 +58,5 @@ app.post('/chat', async (req, res) => {
     }
 });
 
-// ✅ Voice Response Route (Fixing Eleven Labs API Key Format)
-app.get('/voice', async (req, res) => {
-    const userMessage = req.query.message;
-    if (!userMessage) {
-        return res.status(400).json({ error: "❌ No message provided for voice synthesis!" });
-    }
-
-    try {
-        console.log(`🗣️ Generating voice response for: "${userMessage}"`);
-
-        const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${process.env.VOICE_ID_API_KEY}`, {
-            method: "POST",
-            headers: {
-                "xi-api-key": process.env.ELEVENLABS_API_KEY,  
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                text: userMessage,
-                model_id: "eleven_multilingual_v2",
-                voice_settings: {
-                    stability: 0.5,
-                    similarity_boost: 0.8
-                }
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error(`Eleven Labs API Error: ${await response.text()}`);
-        }
-
-        const audioBuffer = await response.arrayBuffer();
-        res.setHeader("Content-Type", "audio/mpeg");
-        res.send(Buffer.from(audioBuffer));
-
-    } catch (error) {
-        console.error("❌ Voice Error:", error);
-        res.status(500).json({ error: "Failed to generate voice response" });
-    }
-});
-
-// ✅ Start Express Server
+// ✅ Start Server
 app.listen(port, () => console.log(`🚀 Chatbot server running on port ${port}`));
