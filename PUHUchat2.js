@@ -6,11 +6,11 @@ const fetch = require('node-fetch');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// ✅ Enable CORS for WordPress and Frontends
+// ✅ Enable CORS for WordPress and Frontend Requests
 app.use(cors());
 app.use(express.json());
 
-// ✅ Debugging: Log Environment Variables
+// ✅ Debugging: Log Loaded Environment Variables
 console.log("🔍 Checking Environment Variables...");
 const requiredEnvVars = [
     "OPENAI_API_KEY",
@@ -24,24 +24,24 @@ requiredEnvVars.forEach(key => {
     console.log(`🔑 ${key}:`, process.env[key] ? "✅ Loaded" : "❌ Missing");
 });
 
-// ✅ Ensure all API keys exist
+// ✅ Ensure all API keys are loaded
 if (!requiredEnvVars.every(key => process.env[key])) {
     console.error("❌ Error: Some API keys are missing! Check your .env file or Render environment.");
     process.exit(1);
 }
 
-// ✅ Basic Route to Check Server Status
+// ✅ Basic Route to Check if Server is Running
 app.get('/', (req, res) => {
     res.send('✅ Chatbot is running!');
 });
 
-// ✅ List Available Voices
+// ✅ Route to List Available Voices
 app.get('/voices', (req, res) => {
     const voices = ["Aaron Clone", "Päivi Clone", "Junior Clone"];
     res.json({ availableVoices: voices });
 });
 
-// ✅ FIX: Adjust Chatbase API Request Method
+// ✅ FIX: Change Chatbase API Request Back to POST
 app.post('/chat', async (req, res) => {
     const userMessage = req.body.message;
     if (!userMessage) {
@@ -51,12 +51,17 @@ app.post('/chat', async (req, res) => {
     console.log("📩 Received Chat Message:", userMessage);
 
     try {
-        const chatbaseResponse = await fetch(`https://www.chatbase.co/api/v1/message?bot_id=${process.env.CHATBASE_BOT_ID}&message=${encodeURIComponent(userMessage)}`, {
-            method: "GET", // ✅ Fix: Chatbase might require GET request instead of POST
+        const chatbaseResponse = await fetch(`https://www.chatbase.co/api/v1/message`, {
+            method: "POST",
             headers: {
                 "Accept": "application/json",
+                "Content-Type": "application/json",
                 "Authorization": `Bearer ${process.env.CHATBASE_API_KEY}`
-            }
+            },
+            body: JSON.stringify({
+                bot_id: process.env.CHATBASE_BOT_ID,
+                message: userMessage
+            })
         });
 
         if (!chatbaseResponse.ok) {
@@ -78,7 +83,7 @@ app.post('/chat', async (req, res) => {
     }
 });
 
-// ✅ Fix Eleven Labs Voice Response
+// ✅ FIX: Properly Format Eleven Labs Voice API Request
 app.get('/voice', async (req, res) => {
     const userMessage = req.query.message;
     if (!userMessage) {
@@ -88,7 +93,7 @@ app.get('/voice', async (req, res) => {
     console.log("🗣️ Generating voice response for:", userMessage);
 
     try {
-        const response = await fetch("https://api.elevenlabs.io/v1/text-to-speech", {
+        const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${process.env.VOICE_ID_API_KEY}`, {
             method: "POST",
             headers: {
                 "Authorization": `Bearer ${process.env.ELEVENLABS_API_KEY}`,
@@ -96,7 +101,11 @@ app.get('/voice', async (req, res) => {
             },
             body: JSON.stringify({
                 text: userMessage,
-                voice_id: process.env.VOICE_ID_API_KEY // ✅ Fix: Use environment variable for voice ID
+                model_id: "eleven_multilingual_v1", // ✅ Ensure correct model is used
+                voice_settings: {
+                    stability: 0.5,
+                    similarity_boost: 0.8
+                }
             })
         });
 
