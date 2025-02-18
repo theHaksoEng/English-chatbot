@@ -8,6 +8,7 @@ const port = process.env.PORT || 3000;
 
 // ✅ Enable CORS for WordPress and other frontends
 app.use(cors());
+app.use(express.json()); // ✅ Fix: Ensure Express can parse JSON body requests
 
 // ✅ Debugging: Log Environment Variables
 console.log("🔍 Checking Environment Variables...");
@@ -34,26 +35,27 @@ app.get('/voices', (req, res) => {
     res.json({ availableVoices: voices });
 });
 
-// ✅ Fix: Chat route using GET (instead of POST) to avoid "Method Not Allowed"
-app.get('/chat', async (req, res) => {
-    const userMessage = req.query.message;  // Now using GET query params
-    if (!userMessage) {
+// ✅ Fix: Chatbase API now correctly uses a POST request
+app.post('/chat', async (req, res) => {
+    const { message } = req.body;
+    if (!message) {
         return res.status(400).json({ error: "❌ No message provided!" });
     }
 
-    console.log(`📩 Received Chat Message: ${userMessage}`);
+    console.log(`📩 Received Chat Message: ${message}`);
 
     try {
-        const chatbaseResponse = await fetch(`https://www.chatbase.co/api/v1/bots/${process.env.CHATBASE_BOT_ID}/query?message=${encodeURIComponent(userMessage)}`, {
-            method: "GET",
+        const chatbaseResponse = await fetch(`https://www.chatbase.co/api/v1/bots/${process.env.CHATBASE_BOT_ID}/chat`, {
+            method: "POST",
             headers: {
                 "Authorization": `Bearer ${process.env.CHATBASE_API_KEY}`,
-                "Accept": "application/json"
-            }
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ message })
         });
 
         if (!chatbaseResponse.ok) {
-            const errorText = await chatbaseResponse.text(); // Log full response
+            const errorText = await chatbaseResponse.text();
             throw new Error(`Chatbase API Error: ${chatbaseResponse.status} - ${errorText}`);
         }
 
@@ -67,7 +69,7 @@ app.get('/chat', async (req, res) => {
     }
 });
 
-// ✅ Fix: Eleven Labs voice synthesis using correct authorization header
+// ✅ Fix: Eleven Labs voice synthesis correctly formatted
 app.get('/voice', async (req, res) => {
     const userMessage = req.query.message;
     if (!userMessage) {
