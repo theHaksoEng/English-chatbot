@@ -6,11 +6,10 @@ const axios = require('axios');
 const app = express();
 const port = process.env.PORT || 10000;
 
-// ✅ Enable CORS for WordPress & other frontends
 app.use(cors());
-app.use(express.json()); // ✅ Allow JSON request body parsing
+app.use(express.json()); // ✅ Ensure JSON body is parsed correctly
 
-// ✅ Debugging: Check Environment Variables
+// ✅ Debugging: Check API Keys
 console.log("🔍 Checking Environment Variables...");
 console.log("🔑 OPENAI_API_KEY:", process.env.OPENAI_API_KEY ? "✅ Loaded" : "❌ Missing");
 console.log("🔑 CHATBASE_API_KEY:", process.env.CHATBASE_API_KEY ? "✅ Loaded" : "❌ Missing");
@@ -24,12 +23,12 @@ if (!process.env.OPENAI_API_KEY || !process.env.CHATBASE_API_KEY || !process.env
     process.exit(1);
 }
 
-// ✅ Route to check if server is running
+// ✅ Check if server is running
 app.get('/', (req, res) => {
     res.send('✅ Chatbot is running!');
 });
 
-// ✅ FIXED: `/chat` Route (Now using POST)
+// ✅ FIXED: Chat API `/chat` (Using Correct Endpoint & POST Method)
 app.post('/chat', async (req, res) => {
     const userMessage = req.body.message;
     if (!userMessage) {
@@ -39,8 +38,7 @@ app.post('/chat', async (req, res) => {
     console.log("📩 Received Chat Message:", userMessage);
 
     try {
-        const response = await axios.post("https://www.chatbase.co/api/v1/conversation/sendMessage", 
-        {
+        const response = await axios.post("https://www.chatbase.co/api/v1/chat", {
             apiKey: process.env.CHATBASE_API_KEY,
             botId: process.env.CHATBASE_BOT_ID,
             message: userMessage
@@ -57,7 +55,7 @@ app.post('/chat', async (req, res) => {
     }
 });
 
-// ✅ FIXED: `/voice` Route (Now properly requests Eleven Labs API)
+// ✅ FIXED: Eleven Labs Voice API `/voice`
 app.get('/voice', async (req, res) => {
     const userMessage = req.query.message;
     if (!userMessage) {
@@ -67,15 +65,14 @@ app.get('/voice', async (req, res) => {
     console.log("🗣️ Generating voice response for:", userMessage);
 
     try {
-        const response = await axios.post(`https://api.elevenlabs.io/v1/text-to-speech/${process.env.VOICE_ID_API_KEY}`, 
-        {
+        const response = await axios.post("https://api.elevenlabs.io/v1/text-to-speech", {
             text: userMessage,
+            voice_id: process.env.VOICE_ID_API_KEY,
             voice_settings: {
                 stability: 0.5,
                 similarity_boost: 0.5
             }
-        }, 
-        {
+        }, {
             headers: {
                 "Authorization": `Bearer ${process.env.ELEVENLABS_API_KEY}`,
                 "Content-Type": "application/json"
@@ -92,5 +89,5 @@ app.get('/voice', async (req, res) => {
     }
 });
 
-// ✅ Start the Express server
+// ✅ Start Express server
 app.listen(port, () => console.log(`🚀 Chatbot server running on port ${port}`));
