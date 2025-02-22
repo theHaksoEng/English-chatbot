@@ -1,93 +1,111 @@
-require('dotenv').config();
+require('dotenv').config(); // Load environment variables from .env file
 const express = require('express');
-const cors = require('cors');
+const bodyParser = require('body-parser');
 const axios = require('axios');
+const fs = require('fs');
 
 const app = express();
-const port = process.env.PORT || 10000;
+app.use(bodyParser.json());
 
-app.use(cors());
-app.use(express.json()); // ✅ Ensure JSON body is parsed correctly
+const PORT = process.env.PORT || 3000; // Default port 3000
 
-// ✅ Debugging: Check API Keys
-console.log("🔍 Checking Environment Variables...");
-console.log("🔑 OPENAI_API_KEY:", process.env.OPENAI_API_KEY ? "✅ Loaded" : "❌ Missing");
-console.log("🔑 CHATBASE_API_KEY:", process.env.CHATBASE_API_KEY ? "✅ Loaded" : "❌ Missing");
-console.log("🔑 CHATBASE_BOT_ID:", process.env.CHATBASE_BOT_ID ? "✅ Loaded" : "❌ Missing");
-console.log("🔑 ELEVENLABS_API_KEY:", process.env.ELEVENLABS_API_KEY ? "✅ Loaded" : "❌ Missing");
-console.log("🔑 VOICE_ID_API_KEY:", process.env.VOICE_ID_API_KEY ? "✅ Loaded" : "❌ Missing");
+// API Keys
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
+const VOICE_ID_API_KEY = process.env.VOICE_ID_API_KEY;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const CHATBASE_BOT_ID = process.env.CHATBASE_BOT_ID;
 
-// ✅ Ensure all API keys exist
-if (!process.env.OPENAI_API_KEY || !process.env.CHATBASE_API_KEY || !process.env.CHATBASE_BOT_ID || !process.env.ELEVENLABS_API_KEY || !process.env.VOICE_ID_API_KEY) {
-    console.error("❌ Error: Some API keys are missing! Check your .env file or Render environment.");
+// Check if all necessary API keys are available
+if (!ELEVENLABS_API_KEY || !VOICE_ID_API_KEY || !OPENAI_API_KEY || !CHATBASE_BOT_ID) {
+    console.error("❌ Missing API keys! Check your .env file.");
     process.exit(1);
 }
 
-// ✅ Check if server is running
-app.get('/', (req, res) => {
-    res.send('✅ Chatbot is running!');
-});
+console.log(`🚀 Chatbot server starting on port ${PORT}`);
 
-// ✅ FIXED: Chat API `/chat` (Using Correct Endpoint & POST Method)
+// Chat Route
 app.post('/chat', async (req, res) => {
-    const userMessage = req.body.message;
-    if (!userMessage) {
-        return res.status(400).json({ error: "❌ No message provided!" });
-    }
-
-    console.log("📩 Received Chat Message:", userMessage);
-
     try {
-        const response = await axios.post("https://www.chatbase.co/api/v1/chat", {
-            apiKey: process.env.CHATBASE_API_KEY,
-            botId: process.env.CHATBASE_BOT_ID,
-            message: userMessage
-        });
+        const userMessage = req.body.message;
+        console.log(`📩 User Message: ${userMessage}`);
 
-        if (response.data && response.data.response) {
-            res.json({ response: response.data.response });
-        } else {
-            throw new Error("Invalid response from Chatbase.");
+        // Get response from OpenAI
+        const chatbotResponseText = await getOpenAIResponse(userMessage);
+        console.log(`✅ OpenAI Response: ${chatbotResponseText}`);
+
+        const chatbotResponse = {
+            text: chatbotResponseText,
+            audio: null
+        };
+
+        // Convert response text to speech using Eleven Labs
+        const audioData = await generateSpeech(chatbotResponseText);
+        if (audioData) {
+            chatbotResponse.audio = 'output.mp3';
+            fs.writeFileSync('output.mp3', audioData);
         }
+
+        res.json(chatbotResponse);
     } catch (error) {
         console.error("❌ Chatbot Error:", error);
-        res.status(500).json({ error: `Failed to generate chatbot response: ${error.message}` });
+        res.status(500).json({ error: "Internal Server Error" });
     }
 });
 
-// ✅ FIXED: Eleven Labs Voice API `/voice`
-app.get('/voice', async (req, res) => {
-    const userMessage = req.query.message;
-    if (!userMessage) {
-        return res.status(400).json({ error: "❌ No message provided for voice synthesis!" });
-    }
-
-    console.log("🗣️ Generating voice response for:", userMessage);
-
+// Function to call OpenAI API for chatbot response
+async function getOpenAIResponse(prompt) {
     try {
-        const response = await axios.post("https://api.elevenlabs.io/v1/text-to-speech", {
-            text: userMessage,
-            voice_id: process.env.VOICE_ID_API_KEY,
-            voice_settings: {
-                stability: 0.5,
-                similarity_boost: 0.5
-            }
-        }, {
-            headers: {
-                "Authorization": `Bearer ${process.env.ELEVENLABS_API_KEY}`,
-                "Content-Type": "application/json"
+        const response = await axios.post(
+            "https://api.openai.com/v1/chat/completions",
+            {
+                model: "gpt-4", // Use GPT-4 model
+                messages: [{ role: "user", content: prompt }],
+                temperature: 0.7 // Adjust creativity level
             },
-            responseType: 'arraybuffer'
-        });
-
-        res.setHeader("Content-Type", "audio/mpeg");
-        res.send(response.data);
-
+            {
+                headers: {
+                    "Authorization": `Bearer ${OPENAI_API_KEY}`,
+                    "Content-Type": "application/json"
+                }
+            }
+        );
+        return response.data.choices[0].message.content;
     } catch (error) {
-        console.error("❌ Voice Error:", error.response ? error.response.data : error);
-        res.status(500).json({ error: `Failed to generate voice response: Eleven Labs API Error: ${error.message}` });
+        console.error("❌ OpenAI API Error:", error.response ? error.response.data : error.message);
+        return "I'm having trouble processing your request right now. Please try again later.";
     }
-});
+}
 
-// ✅ Start Express server
-app.listen(port, () => console.log(`🚀 Chatbot server running on port ${port}`));
+// Function to generate speech using Eleven Labs API
+async function generateSpeech(text) {
+    try {
+        console.log(`🎙️ Generating Speech for: ${text}`);
+
+        const response = await axios.post(
+            `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID_API_KEY}`,
+            {
+                text: text,
+                voice_settings: { stability: 0.5, similarity_boost: 0.8 }
+            },
+            {
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'xi-api-key': ELEVENLABS_API_KEY
+                },
+                responseType: 'arraybuffer'
+            }
+        );
+
+        console.log(`✅ Speech generated successfully.`);
+        return response.data;
+    } catch (error) {
+        console.error("❌ Eleven Labs Error:", error.response ? error.response.data : error.message);
+        return null;
+    }
+}
+
+// Start Server
+app.listen(PORT, () => {
+    console.log(`🚀 Chatbot server running on port ${PORT}`);
+});
