@@ -1,82 +1,69 @@
-require('dotenv').config(); // Load environment variables from .env file
+require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const axios = require('axios');
 const fs = require('fs');
+const { OpenAI } = require('openai');
 
 const app = express();
 app.use(bodyParser.json());
 
-const PORT = process.env.PORT || 3000; // Default port 3000
+const PORT = process.env.PORT || 3000;
 
-// API Keys
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 const VOICE_ID_API_KEY = process.env.VOICE_ID_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const CHATBASE_API_KEY = process.env.CHATBASE_API_KEY;
 const CHATBASE_BOT_ID = process.env.CHATBASE_BOT_ID;
+const port=3001
 
-// Check if all necessary API keys are available
-if (!ELEVENLABS_API_KEY || !VOICE_ID_API_KEY || !OPENAI_API_KEY || !CHATBASE_BOT_ID) {
+if (!ELEVENLABS_API_KEY || !VOICE_ID_API_KEY || !OPENAI_API_KEY || !CHATBASE_API_KEY || !CHATBASE_BOT_ID) {
     console.error("❌ Missing API keys! Check your .env file.");
     process.exit(1);
 }
 
-console.log(`🚀 Chatbot server starting on port ${PORT}`);
+const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+
+// Root route
+app.get('/', (req, res) => {
+    res.send('🚀 Your Chatbot server is running!');
+});
 
 // Chat Route
 app.post('/chat', async (req, res) => {
     try {
         const userMessage = req.body.message;
-        console.log(`📩 User Message: ${userMessage}`);
+        console.log(`📩 User message: ${userMessage}`);
 
-        // Get response from OpenAI
-        const chatbotResponseText = await getOpenAIResponse(userMessage);
-        console.log(`✅ OpenAI Response: ${chatbotResponseText}`);
+        // Chatbase request
+        const chatbaseResponse = await axios.post(`https://www.chatbase.co/api/v1/chat`, {
+            messages: [{ content: userMessage, role: 'user' }],
+            chatId: CHATBASE_BOT_ID
+        }, {
+            headers: { 'Authorization': `Bearer ${CHATBASE_API_KEY}` }
+        });
 
-        const chatbotResponse = {
-            text: chatbotResponseText,
-            audio: null
-        };
+        const responseText = chatbaseResponse.data.text || "Hello! How can I assist you today?";
+        console.log(`✅ Chatbase Response: ${responseText}`);
 
-        // Convert response text to speech using Eleven Labs
-        const audioData = await generateSpeech(chatbotResponseText);
+        // Generate speech using ElevenLabs
+        const audioData = await generateSpeech(responseText);
+        let audioFilename = null;
+
         if (audioData) {
-            chatbotResponse.audio = 'output.mp3';
-            fs.writeFileSync('output.mp3', audioData);
+            audioFilename = 'output.mp3';
+            fs.writeFileSync(audioFilename, audioData);
         }
 
-        res.json(chatbotResponse);
+        res.json({ text: responseText, audio: audioFilename });
+
     } catch (error) {
         console.error("❌ Chatbot Error:", error);
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
 
-// Function to call OpenAI API for chatbot response
-async function getOpenAIResponse(prompt) {
-    try {
-        const response = await axios.post(
-            "https://api.openai.com/v1/chat/completions",
-            {
-                model: "gpt-4", // Use GPT-4 model
-                messages: [{ role: "user", content: prompt }],
-                temperature: 0.7 // Adjust creativity level
-            },
-            {
-                headers: {
-                    "Authorization": `Bearer ${OPENAI_API_KEY}`,
-                    "Content-Type": "application/json"
-                }
-            }
-        );
-        return response.data.choices[0].message.content;
-    } catch (error) {
-        console.error("❌ OpenAI API Error:", error.response ? error.response.data : error.message);
-        return "I'm having trouble processing your request right now. Please try again later.";
-    }
-}
-
-// Function to generate speech using Eleven Labs API
+// Speech Generation Function
 async function generateSpeech(text) {
     try {
         console.log(`🎙️ Generating Speech for: ${text}`);
@@ -99,8 +86,9 @@ async function generateSpeech(text) {
 
         console.log(`✅ Speech generated successfully.`);
         return response.data;
+
     } catch (error) {
-        console.error("❌ Eleven Labs Error:", error.response ? error.response.data : error.message);
+        console.error("❌ ElevenLabs Error:", error.response ? error.response.data : error.message);
         return null;
     }
 }
