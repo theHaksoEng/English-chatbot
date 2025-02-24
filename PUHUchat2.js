@@ -15,7 +15,7 @@ const VOICE_ID_API_KEY = process.env.VOICE_ID_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const CHATBASE_API_KEY = process.env.CHATBASE_API_KEY;
 const CHATBASE_BOT_ID = process.env.CHATBASE_BOT_ID;
-const port=3001
+const PORT = process.env.PORT || 3001;
 
 if (!ELEVENLABS_API_KEY || !VOICE_ID_API_KEY || !OPENAI_API_KEY || !CHATBASE_API_KEY || !CHATBASE_BOT_ID) {
     console.error("❌ Missing API keys! Check your .env file.");
