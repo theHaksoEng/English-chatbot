@@ -1,62 +1,79 @@
-const express = require('express');
-const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
-const dotenv = require('dotenv');
-
-dotenv.config();
+const express = require("express");
+const axios = require("axios");
+const fs = require("fs");
+const path = require("path");
+require("dotenv").config();
 
 const app = express();
-const PORT = process.env.PORT || 3001;
-
-// Middleware
 app.use(express.json());
-app.use('/audio', express.static(path.join(__dirname, 'public/audio'))); // Serve audio files
+
+// Ensure the public/audio directory exists
+const audioDir = path.join(__dirname, "public/audio");
+if (!fs.existsSync(audioDir)) {
+    fs.mkdirSync(audioDir, { recursive: true });
+}
+
+// Serve static audio files
+app.use("/audio", express.static(audioDir));
+
+const PORT = process.env.PORT || 3001;
+const CHATBASE_API_KEY = process.env.CHATBASE_API_KEY;
+const CHATBASE_BOT_ID = process.env.CHATBASE_BOT_ID;
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
+const VOICE_ID = process.env.VOICE_ID;
 
 // Chatbot Route
-app.post('/chat', async (req, res) => {
+app.post("/chat", async (req, res) => {
     try {
         const userMessage = req.body.messages[0].content;
 
-        // Send request to Chatbase
-        const chatResponse = await axios.post('https://www.chatbase.co/api/v1/chat', {
-            chatbotId: process.env.CHATBASE_BOT_ID,
-            messages: [{ content: userMessage, role: "user" }]
-        }, {
-            headers: { Authorization: `Bearer ${process.env.CHATBASE_API_KEY}` }
-        });
+        console.log(`📩 User Message: ${userMessage}`);
+
+        // Chatbase API Request
+        const chatResponse = await axios.post(
+            "https://www.chatbase.co/api/v1/chat",
+            {
+                chatbotId: CHATBASE_BOT_ID,
+                messages: [{ content: userMessage, role: "user" }],
+            },
+            {
+                headers: { Authorization: `Bearer ${CHATBASE_API_KEY}` },
+            }
+        );
 
         const botReply = chatResponse.data.text;
+        console.log(`✅ Chatbase Response: ${botReply}`);
 
-        // Generate Speech via ElevenLabs API
+        // ElevenLabs API Request (Text-to-Speech)
         const elevenLabsResponse = await axios.post(
-            `https://api.elevenlabs.io/v1/text-to-speech/${process.env.VOICE_ID_API_KEY}`,
+            `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`,
             {
                 text: botReply,
-                voice_settings: { stability: 0.5, similarity_boost: 0.8 }
+                voice_settings: { stability: 0.5, similarity_boost: 0.8 },
             },
             {
                 headers: {
-                    'xi-api-key': process.env.ELEVENLABS_API_KEY,
-                    'Content-Type': 'application/json'
+                    "xi-api-key": ELEVENLABS_API_KEY,
+                    "Content-Type": "application/json",
                 },
-                responseType: 'arraybuffer'
+                responseType: "arraybuffer",
             }
         );
 
         // Save the audio file
-        const audioPath = path.join(__dirname, 'public/audio/output.mp3');
-        fs.writeFileSync(audioPath, elevenLabsResponse.data);
+        const audioFilePath = path.join(audioDir, "output.mp3");
+        fs.writeFileSync(audioFilePath, elevenLabsResponse.data);
+        console.log("✅ Speech saved successfully.");
 
-        // Send response back
+        // Send response with text and audio file URL
         res.json({
             text: botReply,
-            audio: '/audio/output.mp3'
+            audio: "https://puhuchat2.onrender.com/audio/output.mp3",
         });
 
     } catch (error) {
-        console.error('Error:', error.message);
-        res.status(500).json({ error: 'Internal Server Error' });
+        console.error("❌ Error processing request:", error);
+        res.status(500).json({ error: "Internal Server Error" });
     }
 });
 
