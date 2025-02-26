@@ -1,5 +1,4 @@
-require('dotenv').config();
-
+require('dotenv').config();  // Load environment variables from .env file
 const express = require('express');
 const bodyParser = require('body-parser');
 const axios = require('axios');
@@ -8,51 +7,59 @@ const fs = require('fs');
 const app = express();
 app.use(bodyParser.json());
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000; // Default to port 3000
 
-// API keys from .env
+// API Keys
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 const VOICE_ID_API_KEY = process.env.VOICE_ID_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const CHATBASE_API_KEY = process.env.CHATBASE_API_KEY;
 const CHATBASE_BOT_ID = process.env.CHATBASE_BOT_ID;
 
-// Verify all API keys are loaded
 if (!ELEVENLABS_API_KEY || !VOICE_ID_API_KEY || !OPENAI_API_KEY || !CHATBASE_API_KEY || !CHATBASE_BOT_ID) {
     console.error("❌ Missing API keys! Check your .env file.");
     process.exit(1);
 }
 
-// Root route for health check
+console.log(`🚀 Chatbot server starting on port ${PORT}`);
+
+// Simple Home Route
 app.get('/', (req, res) => {
-    res.send('🚀 Chatbot server is running successfully!');
+    res.send("🚀 Chatbot server is running successfully!");
 });
 
-// Chat route
+// Chat Route
 app.post('/chat', async (req, res) => {
     try {
         const userMessage = req.body.message;
-        console.log(`📩 User Request: ${userMessage}`);
+        console.log(`📩 User Message: ${userMessage}`);
 
-        // Chatbase request
-        const chatbaseResponse = await axios.post(`https://www.chatbase.co/api/v1/chat`, {
-            api_key: CHATBASE_API_KEY,
-            bot_id: CHATBASE_BOT_ID,
-            messages: [{ content: userMessage, role: 'user' }]
-        });
+        // Send to Chatbase API
+        const chatbaseResponse = await axios.post(
+            "https://www.chatbase.co/api/v1/chat",
+            {
+                chatbotId: CHATBASE_BOT_ID,
+                messages: [{ content: userMessage, role: "user" }]
+            },
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${CHATBASE_API_KEY}`
+                }
+            }
+        );
 
-        const chatbotReply = chatbaseResponse.data.text;
-        console.log(`✅ Chatbase Response: ${chatbotReply}`);
+        const chatbotText = chatbaseResponse.data.message;
+        console.log(`✅ Chatbase Response: ${chatbotText}`);
 
-        // Generate speech using ElevenLabs
-        const audioData = await generateSpeech(chatbotReply);
+        // Convert text to speech
+        const audioData = await generateSpeech(chatbotText);
+        const responsePayload = {
+            text: chatbotText,
+            audio: audioData ? 'output.mp3' : null
+        };
 
-        const audioFilename = 'output.mp3';
-        if (audioData) {
-            fs.writeFileSync(audioFilename, audioData);
-        }
-
-        res.json({ text: chatbotReply, audio: audioFilename });
+        res.json(responsePayload);
     } catch (error) {
         console.error("❌ Chatbot Error:", error);
         res.status(500).json({ error: "Internal Server Error" });
@@ -62,6 +69,8 @@ app.post('/chat', async (req, res) => {
 // Speech Generation Function
 async function generateSpeech(text) {
     try {
+        console.log(`🎙️ Generating Speech for: ${text}`);
+
         const response = await axios.post(
             `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID_API_KEY}`,
             {
@@ -78,8 +87,9 @@ async function generateSpeech(text) {
             }
         );
 
-        console.log("🎙️ Speech generated successfully.");
-        return response.data;
+        fs.writeFileSync('output.mp3', response.data);
+        console.log(`✅ Speech generated successfully.`);
+        return 'output.mp3';
     } catch (error) {
         console.error("❌ Eleven Labs Error:", error.response ? error.response.data : error.message);
         return null;
