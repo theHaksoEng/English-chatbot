@@ -51,6 +51,8 @@ def chat():
 # ✅ Run Flask App
 import os
 
+import os
+
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 4000))  # Get port from Render environment
+    port = int(os.environ.get("PORT", 4000))  # Use Render's assigned port
     app.run(host="0.0.0.0", port=port)
