@@ -1,6 +1,6 @@
 import os
 from flask import Flask, request, jsonify
-from elevenlabs import Voices, TextToSpeech
+from elevenlabs import generate
 from dotenv import load_dotenv
 
 # ✅ Load API Keys from .env
@@ -11,21 +11,8 @@ ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 if not ELEVENLABS_API_KEY:
     raise ValueError("❌ ELEVENLABS_API_KEY is not set! Check your .env file.")
 
-# ✅ Initialize ElevenLabs TTS
-tts = TextToSpeech(api_key=ELEVENLABS_API_KEY)
-
-# ✅ Find Your Voice ID
-voice_name = "Aaron Haskins clone"  # Change this to the correct name of your voice
-voices = Voices(api_key=ELEVENLABS_API_KEY).list()
-
-voice_id = None
-for v in voices:
-    if v.name == voice_name:
-        voice_id = v.voice_id
-        break
-
-if not voice_id:
-    raise ValueError(f"❌ Voice '{voice_name}' not found in ElevenLabs. Check your voice settings!")
+# ✅ Define the voice name (Change this if needed)
+VOICE_NAME = "Aaron Haskins clone"
 
 # ✅ Create Flask App
 app = Flask(__name__)
@@ -44,7 +31,7 @@ def chat():
 
     # ✅ Convert text to speech using ElevenLabs
     try:
-        audio = tts.synthesize(text=chatbot_response, voice_id=voice_id)
+        audio = generate(text=chatbot_response, voice=VOICE_NAME, api_key=ELEVENLABS_API_KEY)
         return jsonify({"reply": chatbot_response, "audio": audio})
     except Exception as e:
         return jsonify({"error": f"ElevenLabs Error: {e}"}), 500
