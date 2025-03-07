@@ -1,6 +1,6 @@
 import os
 from flask import Flask, request, jsonify
-from elevenlabs import generate
+from elevenlabs import TextToSpeech
 from dotenv import load_dotenv
 
 # ✅ Load API Keys from .env
@@ -31,7 +31,8 @@ def chat():
 
     # ✅ Convert text to speech using ElevenLabs
     try:
-        audio = generate(text=chatbot_response, voice=VOICE_NAME, api_key=ELEVENLABS_API_KEY)
+        tts = TextToSpeech(api_key=ELEVENLABS_API_KEY)
+        audio = tts.synthesize(chatbot_response, voice=VOICE_NAME)
         return jsonify({"reply": chatbot_response, "audio": audio})
     except Exception as e:
         return jsonify({"error": f"ElevenLabs Error: {e}"}), 500
