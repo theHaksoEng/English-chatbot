@@ -49,5 +49,8 @@ def chat():
     return jsonify({"reply": chatbot_response, "speech": speech_result})
 
 # ✅ Run Flask App
+import os
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 4000))  # Get port from Render environment
+    app.run(host="0.0.0.0", port=port)
