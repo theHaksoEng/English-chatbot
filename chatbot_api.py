@@ -1,6 +1,23 @@
 import os
 from flask import Flask, request, jsonify
-from elevenlabs import text_to_speech, play, set_api_key
+from elevenlabs import generate, play
+import elevenlabs
+
+from elevenlabs import generate, play
+import os
+
+# Load API key
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
+
+# Check if API key exists
+if not ELEVENLABS_API_KEY:
+    raise ValueError("ELEVENLABS_API_KEY is missing! Check your .env file.")
+
+# Generate audio
+def generate_speech(text, voice="Aaron Haskins clone"):
+    audio = generate(text=text, voice=voice, api_key=ELEVENLABS_API_KEY)
+    play(audio)
+    return "Audio generated and played."
 
 # ✅ Load API Keys from .env
 from dotenv import load_dotenv
