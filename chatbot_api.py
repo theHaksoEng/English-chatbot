@@ -1,58 +1,40 @@
-import os
 from flask import Flask, request, jsonify
-from elevenlabs.client import ElevenLabs
-from elevenlabs import play
-from dotenv import load_dotenv
+import os
+import requests
 
-# ✅ Load environment variables
-load_dotenv()
-
-ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
-ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID")  # ✅ Get voice ID
-
-# ✅ Ensure API Key & Voice ID are set
-if not ELEVENLABS_API_KEY:
-    raise ValueError("❌ ELEVENLABS_API_KEY is not set! Check your .env file.")
-if not ELEVENLABS_VOICE_ID:
-    raise ValueError("❌ ELEVENLABS_VOICE_ID is not set! Check your .env file.")
-
-# ✅ Flask App
 app = Flask(__name__)
 
-@app.route("/", methods=["GET"])
+@app.route("/")
 def home():
     return "Chatbot API is running!"
 
-# ✅ Function to Generate Speech
-def generate_speech(text):
-    try:
-        client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
-
-        audio = client.text_to_speech.convert(text=text, voice_id=ELEVENLABS_VOICE_ID)  # ✅ Pass voice_id
-        play(audio)  # ✅ Play the generated speech
-        return "Audio generated and played."
-    except Exception as e:
-        return f"Error: {str(e)}"
-
-# ✅ Chat Endpoint
 @app.route("/chat", methods=["POST"])
 def chat():
-    data = request.json
-    user_input = data.get("message", "")
+    data = request.get_json()
+    user_message = data.get("message", "")
+    return jsonify({"response": f"You said: {user_message}"})
 
-    # Process chatbot response
-    chatbot_response = f"You said: {user_input}"
+@app.route("/voice_chat", methods=["POST"])
+def voice_chat():
+    data = request.get_json()
+    audio_url = data.get("audio_url")
 
-    # ✅ Convert text to speech using ElevenLabs
-    speech_result = generate_speech(chatbot_response)
+    if not audio_url:
+        return jsonify({"error": "No audio URL provided"}), 400
 
-    return jsonify({"reply": chatbot_response, "speech": speech_result})
+    # Example: Convert speech to text using OpenAI Whisper API
+    audio_response = requests.get(audio_url)
+    if audio_response.status_code != 200:
+        return jsonify({"error": "Failed to download audio"}), 500
 
-# ✅ Run Flask App
-import os
+    with open("input_audio.wav", "wb") as f:
+        f.write(audio_response.content)
 
-import os
+    # Replace with actual OpenAI Whisper or Speech-to-Text processing
+    transcribed_text = "Example transcription: Hello chatbot!"
+
+    return jsonify({"response": transcribed_text})
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 4000))  # Use Render's assigned port
+    port = int(os.environ.get("PORT", 4000))
     app.run(host="0.0.0.0", port=port)
