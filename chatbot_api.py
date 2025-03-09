@@ -1,40 +1,60 @@
 from flask import Flask, request, jsonify
 import os
 import requests
+from pydub import AudioSegment
 
 app = Flask(__name__)
+
+# Set up an upload folder (Render allows writing to /tmp)
+UPLOAD_FOLDER = "/tmp"
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 @app.route("/")
 def home():
     return "Chatbot API is running!"
 
+# Simple text-based chatbot response
 @app.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json()
-    user_message = data.get("message", "")
-    return jsonify({"response": f"You said: {user_message}"})
+    message = data.get("message", "")
+    return jsonify({"response": f"You said: {message}"})
 
+# Upload audio file
+@app.route('/upload_audio', methods=['POST'])
+def upload_audio():
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    file = request.files["file"]
+    file_path = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
+    file.save(file_path)
+
+    return jsonify({"response": f"Audio uploaded and saved at {file_path}!"})
+
+# Process voice chat (convert & simulate response)
 @app.route("/voice_chat", methods=["POST"])
 def voice_chat():
-    data = request.get_json()
-    audio_url = data.get("audio_url")
+    if "file" not in request.files:
+        return jsonify({"error": "No audio file provided"}), 400
 
-    if not audio_url:
-        return jsonify({"error": "No audio URL provided"}), 400
+    file = request.files["file"]
+    file_path = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
+    file.save(file_path)
 
-    # Example: Convert speech to text using OpenAI Whisper API
-    audio_response = requests.get(audio_url)
-    if audio_response.status_code != 200:
-        return jsonify({"error": "Failed to download audio"}), 500
+    try:
+        # Convert audio to WAV if needed
+        audio = AudioSegment.from_file(file_path)
+        wav_path = file_path.replace(file.filename, "converted.wav")
+        audio.export(wav_path, format="wav")
 
-    with open("input_audio.wav", "wb") as f:
-        f.write(audio_response.content)
+        # Simulating chatbot response (replace with real processing logic)
+        chatbot_response = "Hello, I received your voice message!"
 
-    # Replace with actual OpenAI Whisper or Speech-to-Text processing
-    transcribed_text = "Example transcription: Hello chatbot!"
-
-    return jsonify({"response": transcribed_text})
+        return jsonify({"response": chatbot_response, "saved_audio": wav_path})
+    
+    except Exception as e:
+        return jsonify({"error": f"Failed to process audio: {str(e)}"}), 500
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 4000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 4000)), debug=True)
