@@ -105,6 +105,28 @@ def voice_chat():
             return jsonify({"error": f"Exception occurred: {str(e)}"}), 500
 
     return jsonify({"error": "Invalid file type. Only WAV, MP3, and OGG are allowed."}), 400
+import os
+from flask import Flask, jsonify, send_file, request
+
+app = Flask(__name__)
+
+# Route to list files in the server's /tmp directory
+@app.route("/list_files", methods=["GET"])
+def list_files():
+    files = os.listdir("/tmp")  # Lists files in /tmp directory
+    return jsonify({"files": files})
+
+# Route to allow downloading audio file
+@app.route("/download_audio", methods=["GET"])
+def download_audio():
+    file_path = "/tmp/output.wav"  # Change to your actual saved file path if different
+    if os.path.exists(file_path):
+        return send_file(file_path, as_attachment=True)
+    return jsonify({"error": "File not found"}), 404
+
+# Ensure the app runs
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=4000)  # Make sure this matches your Render port
 
 
 # ✅ Run Flask app (if running locally)
