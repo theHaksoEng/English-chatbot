@@ -1,6 +1,6 @@
 import os
 import requests
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 from pydub import AudioSegment
 
@@ -44,14 +44,18 @@ def upload_audio():
         filename = secure_filename(file.filename)
         file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
         file.save(file_path)
+
         return jsonify({"file_path": file_path, "response": f"Audio uploaded and saved at {file_path}!"})
 
     return jsonify({"error": "Invalid file type. Only WAV, MP3, and OGG are allowed."}), 400
 
 
-# ✅ Voice chat processing
+# ✅ Voice chat processing with ElevenLabs API
 @app.route("/voice_chat", methods=["POST"])
 def voice_chat():
+    if ELEVENLABS_API_KEY is None:
+        return jsonify({"error": "Eleven Labs API key is missing"}), 500
+
     if "file" not in request.files:
         return jsonify({"error": "No audio file uploaded"}), 400
 
@@ -105,30 +109,35 @@ def voice_chat():
             return jsonify({"error": f"Exception occurred: {str(e)}"}), 500
 
     return jsonify({"error": "Invalid file type. Only WAV, MP3, and OGG are allowed."}), 400
-import os
-from flask import Flask, jsonify, send_file, request
 
-app = Flask(__name__)
 
-# Route to list files in the server's /tmp directory
+# ✅ Route to list all files in the /tmp directory
 @app.route("/list_files", methods=["GET"])
 def list_files():
-    files = os.listdir("/tmp")  # Lists files in /tmp directory
-    return jsonify({"files": files})
+    try:
+        files = os.listdir(UPLOAD_FOLDER)
+        return jsonify({"files": files})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-# Route to allow downloading audio file
+
+# ✅ Route to download the most recent audio file
 @app.route("/download_audio", methods=["GET"])
 def download_audio():
-    file_path = "/tmp/output.wav"  # Change to your actual saved file path if different
-    if os.path.exists(file_path):
+    try:
+        files = [f for f in os.listdir(UPLOAD_FOLDER) if f.endswith((".wav", ".mp3", ".ogg"))]
+        if not files:
+            return jsonify({"error": "No audio files found"}), 404
+
+        latest_file = max(files, key=lambda f: os.path.getctime(os.path.join(UPLOAD_FOLDER, f)))
+        file_path = os.path.join(UPLOAD_FOLDER, latest_file)
+
         return send_file(file_path, as_attachment=True)
-    return jsonify({"error": "File not found"}), 404
 
-# Ensure the app runs
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=4000)  # Make sure this matches your Render port
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
-# ✅ Run Flask app (if running locally)
+# ✅ Run Flask app (Ensure it runs on Render's specified port)
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 4000)))
