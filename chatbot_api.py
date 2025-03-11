@@ -7,8 +7,11 @@ from pydub import AudioSegment
 # ✅ Load API keys from environment variables
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 
-# ✅ Correct Eleven Labs API URL
-ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1/speech-to-text"
+# ✅ Eleven Labs Speech-to-Text API URL
+ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1/transcriptions"
+
+# ✅ Define the Eleven Labs model ID (update this if needed)
+ELEVENLABS_MODEL_ID = "whisper-large-v2"  # Make sure this is a valid model
 
 # ✅ Initialize Flask app
 app = Flask(__name__)
@@ -80,13 +83,18 @@ def voice_chat():
         try:
             with open(output_path, "rb") as audio_file:
                 headers = {
-                    "Authorization": f"Bearer {ELEVENLABS_API_KEY}",
-                    "Content-Type": "audio/wav"
+                    "Authorization": f"Bearer {ELEVENLABS_API_KEY}"
                 }
+                data = {
+                    "model_id": ELEVENLABS_MODEL_ID  # Ensure this field is included
+                }
+                files = {"file": audio_file}
+
                 response = requests.post(
                     ELEVENLABS_API_URL,
                     headers=headers,
-                    files={"file": audio_file}
+                    data=data,
+                    files=files
                 )
 
             # ✅ Handle API response
