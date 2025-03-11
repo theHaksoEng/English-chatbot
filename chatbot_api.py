@@ -4,17 +4,20 @@ from flask import Flask, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 from pydub import AudioSegment
 
-# Load API keys from environment variables
+# ✅ Load API keys from environment variables
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 
-# Initialize Flask app
+# ✅ Correct Eleven Labs API URL
+ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1/speech-to-text"
+
+# ✅ Initialize Flask app
 app = Flask(__name__)
 UPLOAD_FOLDER = "/tmp"
 ALLOWED_EXTENSIONS = {"wav", "mp3", "ogg"}
 
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-# Ensure the upload folder exists
+# ✅ Ensure the upload folder exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
@@ -44,23 +47,19 @@ def upload_audio():
         filename = secure_filename(file.filename)
         file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
         file.save(file_path)
-
         return jsonify({"file_path": file_path, "response": f"Audio uploaded and saved at {file_path}!"})
 
     return jsonify({"error": "Invalid file type. Only WAV, MP3, and OGG are allowed."}), 400
 
 
-# ✅ Voice chat processing with ElevenLabs API
+# ✅ Voice chat processing (transcription)
 @app.route("/voice_chat", methods=["POST"])
 def voice_chat():
-    if ELEVENLABS_API_KEY is None:
-        return jsonify({"error": "Eleven Labs API key is missing"}), 500
-
     if "file" not in request.files:
         return jsonify({"error": "No audio file uploaded"}), 400
 
     file = request.files["file"]
-    
+
     if file.filename == "":
         return jsonify({"error": "No file selected"}), 400
 
@@ -69,7 +68,7 @@ def voice_chat():
         input_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
         file.save(input_path)
 
-        # Convert audio to WAV (if not already WAV)
+        # Convert audio to WAV (if needed)
         output_path = os.path.join(app.config["UPLOAD_FOLDER"], "converted.wav")
         if filename.endswith(".mp3") or filename.endswith(".ogg"):
             audio = AudioSegment.from_file(input_path)
@@ -77,7 +76,7 @@ def voice_chat():
         else:
             output_path = input_path
 
-        # ✅ Call Eleven Labs API for transcription
+        # ✅ Send the audio to Eleven Labs API for transcription
         try:
             with open(output_path, "rb") as audio_file:
                 headers = {
@@ -85,7 +84,7 @@ def voice_chat():
                     "Content-Type": "audio/wav"
                 }
                 response = requests.post(
-                    "https://api.elevenlabs.io/v1/transcribe",
+                    ELEVENLABS_API_URL,
                     headers=headers,
                     files={"file": audio_file}
                 )
@@ -111,33 +110,22 @@ def voice_chat():
     return jsonify({"error": "Invalid file type. Only WAV, MP3, and OGG are allowed."}), 400
 
 
-# ✅ Route to list all files in the /tmp directory
+# ✅ List files in the `/tmp` directory
 @app.route("/list_files", methods=["GET"])
 def list_files():
-    try:
-        files = os.listdir(UPLOAD_FOLDER)
-        return jsonify({"files": files})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    files = os.listdir("/tmp")  # Lists files in /tmp directory
+    return jsonify({"files": files})
 
 
-# ✅ Route to download the most recent audio file
+# ✅ Route to allow downloading audio file
 @app.route("/download_audio", methods=["GET"])
 def download_audio():
-    try:
-        files = [f for f in os.listdir(UPLOAD_FOLDER) if f.endswith((".wav", ".mp3", ".ogg"))]
-        if not files:
-            return jsonify({"error": "No audio files found"}), 404
-
-        latest_file = max(files, key=lambda f: os.path.getctime(os.path.join(UPLOAD_FOLDER, f)))
-        file_path = os.path.join(UPLOAD_FOLDER, latest_file)
-
+    file_path = "/tmp/output.wav"  # Change to your actual saved file path if different
+    if os.path.exists(file_path):
         return send_file(file_path, as_attachment=True)
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify({"error": "File not found"}), 404
 
 
-# ✅ Run Flask app (Ensure it runs on Render's specified port)
+# ✅ Run Flask app (on Render)
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 4000)))
