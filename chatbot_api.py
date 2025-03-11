@@ -4,23 +4,18 @@ from flask import Flask, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 from pydub import AudioSegment
 
-# ✅ Load API keys from environment variables
+# Load API keys from environment variables
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
+ELEVENLABS_MODEL_ID = os.getenv("ELEVENLABS_MODEL_ID", "whisper-1")  # Ensure correct model ID
 
-# ✅ Eleven Labs Speech-to-Text API URL
-ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1/transcriptions"
-
-# ✅ Define the Eleven Labs model ID (update this if needed)
-ELEVENLABS_MODEL_ID = "whisper-large-v2"  # Make sure this is a valid model
-
-# ✅ Initialize Flask app
+# Initialize Flask app
 app = Flask(__name__)
 UPLOAD_FOLDER = "/tmp"
 ALLOWED_EXTENSIONS = {"wav", "mp3", "ogg"}
 
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-# ✅ Ensure the upload folder exists
+# Ensure the upload folder exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
@@ -91,7 +86,7 @@ def voice_chat():
                 files = {"file": audio_file}
 
                 response = requests.post(
-                    ELEVENLABS_API_URL,
+                    "https://api.elevenlabs.io/v1/audio/transcriptions",  # ✅ Correct API endpoint
                     headers=headers,
                     data=data,
                     files=files
@@ -118,22 +113,22 @@ def voice_chat():
     return jsonify({"error": "Invalid file type. Only WAV, MP3, and OGG are allowed."}), 400
 
 
-# ✅ List files in the `/tmp` directory
+# ✅ Route to list files in the /tmp directory
 @app.route("/list_files", methods=["GET"])
 def list_files():
-    files = os.listdir("/tmp")  # Lists files in /tmp directory
+    files = os.listdir(UPLOAD_FOLDER)  # Lists files in /tmp directory
     return jsonify({"files": files})
 
 
-# ✅ Route to allow downloading audio file
+# ✅ Route to download audio file
 @app.route("/download_audio", methods=["GET"])
 def download_audio():
-    file_path = "/tmp/output.wav"  # Change to your actual saved file path if different
+    file_path = os.path.join(UPLOAD_FOLDER, "converted.wav")  # Ensure correct file path
     if os.path.exists(file_path):
         return send_file(file_path, as_attachment=True)
     return jsonify({"error": "File not found"}), 404
 
 
-# ✅ Run Flask app (on Render)
+# ✅ Run Flask app (Render Deployment)
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 4000)))
