@@ -4,28 +4,27 @@ from flask import Flask, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 from pydub import AudioSegment
 
-# ✅ Load API keys from environment variables
+# Load API keys from environment variables
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 
-# ✅ Initialize Flask app
+# Initialize Flask app
 app = Flask(__name__)
 UPLOAD_FOLDER = "/tmp"
 ALLOWED_EXTENSIONS = {"wav", "mp3", "ogg"}
 
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)  # Ensure the upload folder exists
 
+# Ensure the upload folder exists
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # ✅ Utility: Check allowed file type
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
-
 # ✅ Root API check
 @app.route("/", methods=["GET"])
 def home():
     return jsonify({"message": "Chatbot API is running!"})
-
 
 # ✅ Upload audio file
 @app.route("/upload_audio", methods=["POST"])
@@ -45,8 +44,7 @@ def upload_audio():
 
     return jsonify({"error": "Invalid file type. Only WAV, MP3, and OGG are allowed."}), 400
 
-
-# ✅ Voice chat processing with Eleven Labs API
+# ✅ Process voice chat (Fixed Eleven Labs API)
 @app.route("/voice_chat", methods=["POST"])
 def voice_chat():
     if "file" not in request.files:
@@ -61,7 +59,7 @@ def voice_chat():
         input_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
         file.save(input_path)
 
-        # ✅ Convert audio to WAV (if not already WAV)
+        # Convert to WAV if necessary
         output_path = os.path.join(app.config["UPLOAD_FOLDER"], "converted.wav")
         if filename.endswith(".mp3") or filename.endswith(".ogg"):
             audio = AudioSegment.from_file(input_path)
@@ -69,15 +67,15 @@ def voice_chat():
         else:
             output_path = input_path
 
-        # ✅ Send file to Eleven Labs API for transcription
+        # ✅ Call Eleven Labs API for transcription
         try:
             with open(output_path, "rb") as audio_file:
                 headers = {
-                    "xi-api-key": ELEVENLABS_API_KEY,  # ✅ Ensure correct API Key usage
+                    "xi-api-key": ELEVENLABS_API_KEY  # ✅ Fixed API key header
                 }
                 files = {
                     "file": audio_file,
-                    "model_id": (None, "whisper-1"),  # ✅ Whisper model for transcription
+                    "model_id": (None, "whisper-1")  # ✅ Required model_id
                 }
                 response = requests.post("https://api.elevenlabs.io/v1/transcriptions", headers=headers, files=files)
 
@@ -101,23 +99,20 @@ def voice_chat():
 
     return jsonify({"error": "Invalid file type. Only WAV, MP3, and OGG are allowed."}), 400
 
-
-# ✅ Debugging: List uploaded files
+# ✅ List files in /tmp directory
 @app.route("/list_files", methods=["GET"])
 def list_files():
-    files = os.listdir(UPLOAD_FOLDER)  # ✅ List files in the temp directory
+    files = os.listdir(UPLOAD_FOLDER)
     return jsonify({"files": files})
 
-
-# ✅ Debugging: Download uploaded audio file
+# ✅ Download processed audio file
 @app.route("/download_audio", methods=["GET"])
 def download_audio():
-    file_path = os.path.join(UPLOAD_FOLDER, "output.wav")  # ✅ Ensure correct file path
+    file_path = os.path.join(UPLOAD_FOLDER, "converted.wav")
     if os.path.exists(file_path):
         return send_file(file_path, as_attachment=True)
     return jsonify({"error": "File not found"}), 404
 
-
-# ✅ Ensure the app runs on the correct port
+# ✅ Run Flask app
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 4000)))  # ✅ Match the Render port
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 4000)))
