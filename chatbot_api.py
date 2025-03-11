@@ -1,12 +1,13 @@
 import os
 import requests
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 from pydub import AudioSegment
 
 # Load API keys from environment variables
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # OpenAI Whisper for transcription
-ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")  # Eleven Labs for voice
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
+ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID")
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -15,11 +16,11 @@ ALLOWED_EXTENSIONS = {"wav", "mp3", "ogg"}
 
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-# Ensure the upload folder exists
+# Ensure upload directory exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
-# ✅ Utility: Check allowed file type
+# ✅ Utility: Check if the file type is allowed
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -50,14 +51,14 @@ def upload_audio():
     return jsonify({"error": "Invalid file type. Only WAV, MP3, and OGG are allowed."}), 400
 
 
-# ✅ Voice chat processing (Transcribe + Respond + Synthesize)
+# ✅ Voice chat processing
 @app.route("/voice_chat", methods=["POST"])
 def voice_chat():
     if "file" not in request.files:
         return jsonify({"error": "No audio file uploaded"}), 400
 
     file = request.files["file"]
-    
+
     if file.filename == "":
         return jsonify({"error": "No file selected"}), 400
 
@@ -66,7 +67,7 @@ def voice_chat():
         input_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
         file.save(input_path)
 
-        # Convert audio to WAV (if not already WAV)
+        # Convert audio to WAV if necessary
         output_path = os.path.join(app.config["UPLOAD_FOLDER"], "converted.wav")
         if filename.endswith(".mp3") or filename.endswith(".ogg"):
             audio = AudioSegment.from_file(input_path)
@@ -74,63 +75,63 @@ def voice_chat():
         else:
             output_path = input_path
 
-        # ✅ Step 1: Transcribe Audio using OpenAI Whisper API
+        # ✅ Send file to OpenAI Whisper for transcription
         try:
             with open(output_path, "rb") as audio_file:
                 headers = {
-                    "Authorization": f"Bearer {OPENAI_API_KEY}",
-                    "Content-Type": "multipart/form-data"
+                    "Authorization": f"Bearer {OPENAI_API_KEY}"
                 }
+                files = {
+                    "file": (output_path, audio_file, "audio/wav")
+                }
+                data = {
+                    "model": "whisper-1"
+                }
+
                 response = requests.post(
                     "https://api.openai.com/v1/audio/transcriptions",
                     headers=headers,
-                    files={"file": audio_file},
-                    data={"model": "whisper-1"}
+                    files=files,
+                    data=data
                 )
 
+            # ✅ Handle API response
             if response.status_code == 200:
                 transcribed_text = response.json().get("text", "")
 
-                # ✅ Step 2: Send transcribed text to chatbot
-                chatbot_response = f"You said: {transcribed_text}. I am your chatbot!"
+                # ✅ Convert text to speech using Eleven Labs
+                eleven_labs_headers = {
+                    "xi-api-key": ELEVENLABS_API_KEY,
+                    "Content-Type": "application/json"
+                }
+                eleven_labs_data = {
+                    "text": transcribed_text,
+                    "voice_id": ELEVENLABS_VOICE_ID,
+                    "model_id": "eleven_turbo_v2"
+                }
 
-                # ✅ Step 3: Convert chatbot response to speech with Eleven Labs
-                try:
-                    eleven_headers = {
-                        "xi-api-key": ELEVENLABS_API_KEY,
-                        "Content-Type": "application/json"
-                    }
-                    eleven_data = {
-                        "text": chatbot_response,
-                        "voice_id": "fEVT2ExfHe1MyjuiIiU9",
-                        "model_id": "eleven_monolingual_v1"
-                    }
-                    eleven_response = requests.post(
-                        "https://api.elevenlabs.io/v1/text-to-speech",
-                        headers=eleven_headers,
-                        json=eleven_data
-                    )
+                eleven_labs_response = requests.post(
+                    "https://api.elevenlabs.io/v1/text-to-speech",
+                    headers=eleven_labs_headers,
+                    json=eleven_labs_data
+                )
 
-                    if eleven_response.status_code == 200:
-                        audio_output_path = os.path.join(UPLOAD_FOLDER, "response.mp3")
-                        with open(audio_output_path, "wb") as f:
-                            f.write(eleven_response.content)
+                if eleven_labs_response.status_code == 200:
+                    audio_output_path = os.path.join(app.config["UPLOAD_FOLDER"], "response.mp3")
+                    with open(audio_output_path, "wb") as audio_output_file:
+                        audio_output_file.write(eleven_labs_response.content)
 
-                        return jsonify({
-                            "transcription": transcribed_text,
-                            "chatbot_response": chatbot_response,
-                            "audio_response": "/download_audio"
-                        })
-                    else:
-                        return jsonify({
-                            "error": "Eleven Labs speech synthesis failed",
-                            "response_body": eleven_response.text,
-                            "status_code": eleven_response.status_code
-                        }), 500
-
-                except Exception as e:
-                    return jsonify({"error": f"Eleven Labs API Exception: {str(e)}"}), 500
-
+                    return jsonify({
+                        "response": "Processed successfully",
+                        "transcription": transcribed_text,
+                        "saved_audio": audio_output_path
+                    })
+                else:
+                    return jsonify({
+                        "error": "Eleven Labs API request failed",
+                        "status_code": eleven_labs_response.status_code,
+                        "response_body": eleven_labs_response.text
+                    }), 500
             else:
                 return jsonify({
                     "error": "OpenAI Whisper API request failed",
@@ -142,15 +143,6 @@ def voice_chat():
             return jsonify({"error": f"Exception occurred: {str(e)}"}), 500
 
     return jsonify({"error": "Invalid file type. Only WAV, MP3, and OGG are allowed."}), 400
-
-
-# ✅ Route to allow downloading the chatbot's audio response
-@app.route("/download_audio", methods=["GET"])
-def download_audio():
-    file_path = os.path.join(UPLOAD_FOLDER, "response.mp3")
-    if os.path.exists(file_path):
-        return send_file(file_path, as_attachment=True)
-    return jsonify({"error": "File not found"}), 404
 
 
 # ✅ Run Flask app (if running locally)
