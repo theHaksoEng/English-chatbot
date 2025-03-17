@@ -26,12 +26,15 @@ CHATBASE_URL = "https://www.chatbase.co/api/v1/chat"
 # ✅ ElevenLabs API URL
 ELEVENLABS_URL = f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}"
 
-# ✅ Health check route
 @app.route("/", methods=["GET"])
 def home():
     return jsonify({"message": "Chatbot API is running!"})
 
-# ✅ Chatbot route
+@app.route("/status", methods=["GET"])  # 👈 Renamed from "/" to "/status"
+def chatbot_status():
+    return jsonify({"message": "Welcome to the chatbot!"})
+
+# ✅ Fix: Added `@app.route("/chat")` to properly register the endpoint
 @app.route("/chat", methods=["POST"])
 def chat():
     try:
