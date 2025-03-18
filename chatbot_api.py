@@ -5,36 +5,33 @@ from flask_cors import CORS
 
 # ✅ Initialize Flask app
 app = Flask(__name__)
-CORS(app)  # Enable CORS
+CORS(app)  # Enable CORS for cross-origin requests
 
 # ✅ Load API keys from environment variables
 CHATBASE_API_KEY = os.getenv("CHATBASE_API_KEY")
 CHATBASE_BOT_ID = os.getenv("CHATBASE_BOT_ID")
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
-ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "YOUR_DEFAULT_VOICE_ID")  # ✅ Default to prevent crashes
+ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "YOUR_DEFAULT_VOICE_ID")  # Replace with your actual voice ID
 
-# ✅ Ensure required API keys are available
+# ✅ Ensure API keys exist
 if not CHATBASE_API_KEY or not CHATBASE_BOT_ID:
     raise ValueError("Missing Chatbase API Key or Bot ID. Check your environment variables.")
 
 if not ELEVENLABS_API_KEY:
     raise ValueError("Missing ElevenLabs API Key. Check your environment variables.")
 
-# ✅ Chatbase API URL
+# ✅ API URLs
 CHATBASE_URL = "https://www.chatbase.co/api/v1/chat"
-
-# ✅ ElevenLabs API URL
 ELEVENLABS_URL = f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}"
 
 @app.route("/", methods=["GET"])
 def home():
     return jsonify({"message": "Chatbot API is running!"})
 
-@app.route("/status", methods=["GET"])  # 👈 Renamed from "/" to "/status"
+@app.route("/status", methods=["GET"])  
 def chatbot_status():
     return jsonify({"message": "Welcome to the chatbot!"})
 
-# ✅ Fix: Added `@app.route("/chat")` to properly register the endpoint
 @app.route("/chat", methods=["POST"])
 def chat():
     try:
@@ -57,11 +54,11 @@ def chat():
         if chatbase_response.status_code != 200:
             return jsonify({"error": "Chatbase API error", "details": chatbase_response.text}), chatbase_response.status_code
         
-        # ✅ Get chatbot's response
+        # ✅ Get chatbot's text response
         chatbase_json = chatbase_response.json()
         chatbot_text = chatbase_json.get("text", "No response from Chatbase")
 
-        # ✅ Send text to ElevenLabs for speech synthesis
+        # ✅ Send chatbot's response to ElevenLabs for speech synthesis
         elevenlabs_headers = {
             "xi-api-key": ELEVENLABS_API_KEY,
             "Content-Type": "application/json"
@@ -77,7 +74,7 @@ def chat():
         if elevenlabs_response.status_code != 200:
             return jsonify({"error": "ElevenLabs API error", "details": elevenlabs_response.text}), elevenlabs_response.status_code
         
-        # ✅ Get audio URL from ElevenLabs
+        # ✅ Get audio URL from ElevenLabs response
         elevenlabs_json = elevenlabs_response.json()
         audio_url = elevenlabs_json.get("audio_url", "")
 
@@ -88,6 +85,6 @@ def chat():
     except Exception as e:
         return jsonify({"error": "Server error", "details": str(e)}), 500
 
-# ✅ Run the app (For local testing only)
+# ✅ Run Flask app (Local Testing)
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=4000, debug=True)
